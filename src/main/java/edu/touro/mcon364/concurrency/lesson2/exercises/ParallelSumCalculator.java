@@ -3,6 +3,7 @@ package edu.touro.mcon364.concurrency.lesson2.exercises;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.stream.IntStream;
 
 /**
  * Exercise 5 — Returning values from concurrent tasks with {@link Callable} and
@@ -40,22 +41,26 @@ public class ParallelSumCalculator {
     public long parallelSum(List<Integer> numbers, int workers)
             throws InterruptedException, ExecutionException {
 
-        // TODO: create a thread pool with the right number of workers
-
-        // TODO: divide numbers into roughly equal slices — one slice per worker
-        //       Think: how do you calculate the slice size without losing
-        //       the last few elements when the list doesn't divide evenly?
-
-        // TODO: submit each slice as a task that returns its partial sum.
-        //       Collect the handles to the results — but do NOT ask for the
-        //       answers yet, so that all slices run at the same time.
+        ExecutorService pool = Executors.newFixedThreadPool(workers);
         List<Future<Long>> futures = new ArrayList<>();
 
-        // TODO: now that all slices are running, collect each partial sum
-        //       and add it to the total
-        long total = 0;
+        int chunkSize = (numbers.size()+ workers -1)/workers;
+        IntStream.iterate(0, start -> start < numbers.size(), start -> start + chunkSize)
+                .forEach(start -> {
+                    List<Integer> slice = numbers.subList(start, Math.min(start + chunkSize, numbers.size()));
+                    futures.add(pool.submit(
+                            () -> slice.stream().mapToLong(Integer::longValue).sum()
+                    ));
+                });
 
-        // TODO: release pool resources before returning
+        long total = 0;
+        for (Future<Long> f : futures) {
+            long partial = f.get();
+            total += partial;
+        }
+
+        pool.shutdown();
+        pool.awaitTermination(10, TimeUnit.SECONDS);
         return total;
     }
 }

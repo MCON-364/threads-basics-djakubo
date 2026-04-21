@@ -26,26 +26,32 @@ public class IndependentCounters {
 
     private int readCount  = 0;
     private int writeCount = 0;
-
-    // TODO: add two separate lock fields — one to guard readCount, one to guard writeCount.
-    //       Why two locks instead of one?  What contention does that eliminate?
+    private final Lock readLock = new ReentrantLock();
+    private final Lock writeLock = new ReentrantLock();
 
     /**
      * Record a read operation.
-     * TODO: replace the synchronized keyword with an explicit lock.
-     *       Remember: always release the lock even if an exception is thrown.
      */
-    public synchronized void read() {
-        readCount++;
+    public void read() {
+        readLock.lock();
+        try {
+            readCount++;
+        } finally {
+            readLock.unlock();
+        }
     }
+
 
     /**
      * Record a write operation.
-     * TODO: replace the synchronized keyword with an explicit lock.
-     *       Remember: always release the lock even if an exception is thrown.
      */
-    public synchronized void write() {
-        writeCount++;
+    public void write() {
+        writeLock.lock();
+        try {
+            writeCount++;
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     public int getReadCount()  { return readCount; }
