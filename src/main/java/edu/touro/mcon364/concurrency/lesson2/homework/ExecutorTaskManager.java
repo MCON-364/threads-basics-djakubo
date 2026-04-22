@@ -50,7 +50,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *      needed to wait for a batch of tasks to finish before starting the next
  *      batch, and why.
  */
-public class ZExecutorTaskManager {
+public class ExecutorTaskManager {
 
     /* ── SYNCHRONIZER CHOICE ────────────────────────────────────────────────
      * TODO: In 1–3 sentences, explain which synchronizer you would add to
