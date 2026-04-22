@@ -1,5 +1,6 @@
 package edu.touro.mcon364.concurrency.lesson2.exercises;
 
+import java.awt.desktop.AppReopenedEvent;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -25,7 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class PrinterRoom {
 
     private final int printerCount;
-    // TODO: declare a private final Semaphore field
     private final Semaphore semaphore;
 
     // counters visible to tests
@@ -35,9 +35,7 @@ public class PrinterRoom {
 
     public PrinterRoom(int printerCount) {
         this.printerCount = printerCount;
-        // TODO: initialise the semaphore so that exactly printerCount threads
-        //       may be inside print() at the same time
-        this.semaphore = null;
+        this.semaphore = new Semaphore(printerCount);
     }
 
     /**
@@ -47,19 +45,18 @@ public class PrinterRoom {
      * @param document the document to print
      */
     public void print(String document) throws InterruptedException {
-        // TODO: block here until a printer permit is available
+        semaphore.acquire();
 
         try {
-            // TODO: record that one more job is now active, then update the
-            //       high-water mark if the new active count is a new maximum
-
+            int current =  activeCount.incrementAndGet();
+            maxObserved.updateAndGet(prev -> Math.max(prev, current) );
             // Simulate printing time
             Thread.sleep(50);
-
-            // TODO: record that this job has finished
+            completedJobs.incrementAndGet();
         } finally {
-            // TODO: signal that one more printer is free again — do this even
-            //       if an exception was thrown, and update the active count
+            activeCount.decrementAndGet();
+            semaphore.release();
+
         }
     }
 
