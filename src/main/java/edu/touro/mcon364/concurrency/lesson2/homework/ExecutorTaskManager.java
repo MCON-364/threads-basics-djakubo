@@ -2,11 +2,14 @@ package edu.touro.mcon364.concurrency.lesson2.homework;
 
 import edu.touro.mcon364.concurrency.common.model.Priority;
 import edu.touro.mcon364.concurrency.common.model.Task;
+import edu.touro.mcon364.concurrency.lesson1.exercises.ThreadSafeTaskCounter;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Homework — Executor-backed task manager with atomic IDs.
@@ -60,14 +63,16 @@ public class ExecutorTaskManager {
     private static final int POOL_SIZE = 4;
 
     // TODO: declare the thread pool — what factory method gives you a fixed-size pool?
+    ExecutorService pool = Executors.newFixedThreadPool(POOL_SIZE);
 
     // TODO: declare the ID counter — what type guarantees uniqueness without synchronized?
+    AtomicInteger counter = new AtomicInteger();
 
     // List of tasks that have finished — written by worker threads, so needs protection
     private final List<Task> completedTasks = new ArrayList<>();
 
     // TODO: declare the lock that will protect completedTasks
-
+    private final Lock lock = new ReentrantLock();
     // ── ID generation ────────────────────────────────────────────────────────
 
     /**
@@ -75,8 +80,7 @@ public class ExecutorTaskManager {
      * TODO: generate the next ID atomically — no synchronized keyword allowed
      */
     public int nextId() {
-        // TODO: implement
-        return 0;
+        return counter.incrementAndGet();
     }
 
     // ── task submission ──────────────────────────────────────────────────────
@@ -90,12 +94,16 @@ public class ExecutorTaskManager {
      */
     public Future<Task> submit(String description, Priority priority) {
         // TODO: obtain a unique ID for this task
-
+        int id = nextId();
         // TODO: build the Task record
-
+        Task task = new Task(id, description, priority);
         // TODO: hand the task to the pool as a Callable that processes it and
         //       returns it when done — return the Future the pool gives you back
-        return null;
+        Future<Task> future = pool.submit(()->{
+            Thread.currentThread().sleep(10);
+            return task;
+        });
+        return future;
     }
 
     // ── recording completion ─────────────────────────────────────────────────
@@ -107,8 +115,15 @@ public class ExecutorTaskManager {
      * TODO: protect the list so that two threads cannot corrupt it at the same time.
      *       Add a comment explaining exactly why a lock is necessary here.
      */
+    //A lock is necessary to ensure two threads cannot modify the list at the same time
     private void recordCompleted(Task task) {
         // TODO: implement
+        lock.lock();
+        try{
+            completedTasks.add(task);
+        } finally {
+            lock.unlock();
+        }
     }
 
     // ── collecting results ───────────────────────────────────────────────────
@@ -119,10 +134,23 @@ public class ExecutorTaskManager {
      *
      * TODO: retrieve each result in order and collect them into a list.
      *       What should happen if a task threw an exception or was interrupted?
+     *        * 3. Collecting results
+     *  *    - {@link #awaitAll(List)} must call {@code get()} on every future in order
+     *  *      and return the list of completed {@link Task} objects.
+     *  *    - Wrap checked exceptions in {@link RuntimeException}.
      */
+
     public List<Task> awaitAll(List<Future<Task>> futures) {
         // TODO: implement
-        return new ArrayList<>();
+        for(Future<Task> future: futures){
+            try{
+                Task task = future.get();
+                recordCompleted(task);
+            }catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+        }
+       return completedTasks;
     }
 
     // ── lifecycle ────────────────────────────────────────────────────────────
@@ -135,6 +163,8 @@ public class ExecutorTaskManager {
      */
     public void shutdown() throws InterruptedException {
         // TODO: implement
+        pool.shutdown();
+        pool.awaitTermination(10, TimeUnit.SECONDS);
     }
 
     // ── observability ────────────────────────────────────────────────────────
@@ -143,12 +173,19 @@ public class ExecutorTaskManager {
     public List<Task> getCompletedTasks() {
         // TODO: protect the read with the same lock used in recordCompleted,
         //       then return a defensive copy so callers cannot mutate internal state
-        return null;
+        List<Task> completedTasksCopy;
+        try {
+            lock.lock();
+            completedTasksCopy = completedTasks;
+        } finally {
+            lock.unlock();
+        }
+        return completedTasksCopy;
     }
 
     /** Returns the most recently generated ID (useful for assertions). */
     public int getLastIssuedId() {
         // TODO: read the current value from the ID counter
-        return 0;
+        return counter.get();
     }
 }
